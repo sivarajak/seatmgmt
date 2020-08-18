@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Bally Floor Map</title>
+<style type="text/css">
+    body {
+        background-color: ivory;
+        padding:10px;
+    }
+    h1 {
+		color: red;
+		text-align: center;    
+    }
+    #container1 {
+        border:solid 1px #ccc;
+        width:400px;
+        height:546px;
+        float:left;
+        overflow-x: auto;
+    }
+    #container2 {
+        border:solid 1px #ccc;
+        width:850px;
+        height:546px;
+        float:left;
+      	overflow: auto;
+    }
+</style>
+<!--<script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+<script src="http://demos.flesler.com/jquery/scrollTo/js/jquery.scrollTo-min.js"></script> 
+<script src="http://d3lp1msu2r81bx.cloudfront.net/kjs/js/lib/kinetic-v5.0.2.min.js"></script> -->
+<script src="js/jquery/1.7.1/jquery.min.js"></script>
+<script src="js/jquery/jquery.scrollTo-min.js"></script>
+<script src="js/kinetic-v5.0.2.min.js"></script>
+</head>
+
+<body>
+<h1>Bally Floor Map</h1>
+<input type="button" id="savelocbtn" value="Save Location" >
+<!-- <input type="text" id="search" name="search"> -->
+<select name='namelist' id='namelist' >
+	<option value="none">Select a Name</option>
+</select>
+<input type="button" id="searchbtn" value="Search" >
+<div id="container" style="width:1260px">
+<div id="container1"></div>
+<div id="container2"></div>
+</div>
+
+<script>
+	 
+	
+    var highlightWidth = 8;
+ 
+    var stage = new Kinetic.Stage({
+        container: 'container1',
+        width: 400,
+        height: 546
+    });
+    var layer = new Kinetic.Layer();
+    stage.add(layer);
+ 
+ 
+    var dropzone = new Kinetic.Stage({
+        container: 'container2',
+        width: 1500,
+        height: 546
+    });
+    var dropLayer = new Kinetic.Layer();
+    dropzone.add(dropLayer);
+    /* var bgImage = new Image();
+    bgImage.src = 'images/layout.jpg'
+    bgImage.onload = function() {
+    var bgKImage = new Kinetic.Image({
+        image: bgImage,
+        width: 850,
+        height: 546,
+    });
+    dropLayer.add(bgKImage);
+    dropzone.add(dropLayer);
+    }; */
+ 
+ 
+    // these must go after the creation of stages & layers
+    addBackground(stage, layer, dropLayer);
+    layer.draw();
+    //addBackground(dropzone, dropLayer, layer);
+    addDropLayerBackground(dropzone, dropLayer, layer);
+    dropLayer.draw();
+ 
+    var tooltip;
+    function showTooltip(image) {
+        var x = image.x();
+        var y = image.y();
+        tooltip = new Kinetic.Label({
+              x: x,
+              y: y,
+              opacity: 0.75
+            });
+
+        tooltip.add(new Kinetic.Tag({
+          fill: 'green',
+          pointerDirection: 'down',
+          pointerWidth: 10,
+          pointerHeight: 10,
+          lineJoin: 'round',
+          shadowColor: 'black',
+          shadowBlur: 3,
+          shadowOffset: {x:2,y:2},
+          shadowOpacity: 0.1
+        }));
+          
+       tooltip.add(new Kinetic.Text({
+         text: image.attrs.image.title,
+         fontFamily: 'Calibri',
+         fontSize: 18,
+         padding: 5,
+         fill: 'white'
+       }));
+        image.myLayer.add(tooltip);
+        image.myLayer.draw();
+      }
+    var options = $("#namelist");
+   var x = -25, y = 10, loop = 0;
+    $.getJSON("employees", 
+			function(json) {
+				 //var obj = jQuery.parseJSON(json);
+				 $.each(json, function(key,value) {
+					 options.append($("<option />").val(value.empId).text(value.empName));
+					 
+					 
+					 var empImage = new Image();
+					 empImage.id = value.empId;
+					 empImage.title = value.empName + " " + value.empDesignation + " " + value.empTeam;
+					 empImage.name = value.empName;
+					 if(value.empGender == 'M') {
+						 empImage.src = 'images/employee.jpg';
+					 } else {
+						 empImage.src = 'images/femployee.jpg';
+					 }	
+					 if(value.empLocation == null) {
+						 ++loop;
+						 if(loop%5 == 0) {
+							 x = -55;
+							 y = y + 45;
+						 } else {
+							 x = x + 35
+						 }
+						 kImage(empImage, x, y, 20, 20, layer);
+					 } else {
+						 kImage(empImage, value.empLocation.locPosX, value.empLocation.locPosY, 20, 20, dropLayer);
+					 }
+					 
+				 }); 
+				 layer.draw();
+				 dropLayer.draw();
+			}) ;
+		
+    // get images & then trigger start()
+   /*  var images = {};
+    var URLs = {
+        house1: 'images/employee.jpg',
+        house2: 'images/employeef.jpg',
+    };
+    loadImages(URLs, start);
+ 
+ 
+    function start() {
+        var house1 = kImage(images.house1, 10, 10, 50, 50, layer);
+        var house2 = kImage(images.house2, 75, 10, 50, 50, layer);
+        layer.draw();
+    } */
+ 
+    function swapStagesIfSelected(sourceLayer, destinationLayer, startX, startY) {
+ 
+        // get all elements on the source layer
+        var elements = sourceLayer.get("Image");
+ 
+        // don't let dropped elements fall off the stage
+        var totalWidth = 0;
+        var maxHeight = -999;
+        var layerWidth = destinationLayer.getStage().getWidth();
+        var layerHeight = destinationLayer.getStage().getHeight();
+        for (var i = 0; i < elements.length; i++) {
+            if (elements[i].isSelected) {
+                totalWidth += elements[i].getWidth();
+                maxHeight = Math.max(elements[i].getHeight(), maxHeight);
+            }
+        }
+        if (startX + totalWidth > layerWidth) {
+            startX = layerWidth - totalWidth - 15;
+        }
+        if (startY + maxHeight > layerHeight) {
+            startY = layerHeight - maxHeight - 15;
+        }
+ 
+        // move all selected images
+        // to the clicked x/y of the destination layer
+        for (var i = 0; i < elements.length; i++) {
+            var element = elements[i];
+            if (element.isSelected) {
+                var img = element.getImage();
+                kImage(img, startX, startY, element.getWidth(), element.getHeight(), destinationLayer);
+                startX += element.getWidth() + 10;
+                element.remove();
+            }
+        }
+        sourceLayer.draw();
+        destinationLayer.draw();
+    }
+ 
+    // build the specified KineticJS Image and add it to the specified layer
+    function kImage(image, x, y, width, height, theLayer) {
+        var image = new Kinetic.Image({
+            image: image,
+            id: image.id+"k", 
+            name: image.name,
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+            strokeWidth: 0.1,
+            stroke: "green",
+            draggable: true
+        });
+        image.myLayer = theLayer;
+        image.isSelected = false;
+        image.on("click", function () {
+            highlight(this);
+            this.myLayer.draw();
+        });
+        image.on("mouseover", function () {
+            showTooltip(this);
+        });
+        image.on("mouseout", function () {
+            tooltip.destroy();
+            image.myLayer.draw();
+        });
+        image.on("dragstart", function () {
+            tooltip.destroy();
+            image.myLayer.draw();
+        });
+        image.myLayer.add(image);
+        return (image);
+    }
+ 
+ 
+    // build a background image and add it to the specified stage
+    function addBackground(theStage, theLayer, otherLayer) {
+ 
+        var background = new Kinetic.Rect({
+            x: 0,
+            y: 0,
+            width: theStage.getWidth(),
+            height: theStage.getHeight(),
+            fill: "white",
+            stroke: "green",
+            strokeWidth: 1
+        });
+        background.on("click", function () {
+            var pos = theStage.getPointerPosition();
+            var mouseX = parseInt(pos.x);
+            var mouseY = parseInt(pos.y);
+            swapStagesIfSelected(otherLayer, theLayer, mouseX, mouseY);
+        });
+        theLayer.add(background);
+    }
+  
+    function addDropLayerBackground(theStage, theLayer, otherLayer) {
+        var bgImage = new Image();
+        bgImage.src = 'images/layout.jpg'
+        var background = new Kinetic.Rect({
+            x: 0,
+            y: 0,
+            width: theStage.getWidth(),
+            height: theStage.getHeight(),
+            fillPatternImage: bgImage,
+            stroke: "green",
+            strokeWidth: 1
+        });
+        background.on("click", function () {
+            var pos = theStage.getPointerPosition();
+            var mouseX = parseInt(pos.x);
+            var mouseY = parseInt(pos.y);
+            swapStagesIfSelected(otherLayer, theLayer, mouseX, mouseY);
+        });
+        theLayer.add(background);
+    }
+ 
+ 
+    /////////////  Image loader
+ 
+    /* function loadImages(URLs, callback) {
+        var loaded = 0;
+        var needed = 0;
+        for (var url in URLs) {
+            needed++;
+            console.log(url);
+        }
+        for (var url in URLs) {
+            images[url] = new Image();
+            images[url].onload = function () {
+                if (++loaded >= needed) {
+                    callback(images);
+                }
+            };
+            images[url].src = URLs[url];
+        }
+    } */
+ 
+    /////////////  Toggle Highlighting
+ 
+    function highlight(element, setStrokeWidth) {
+        if (setStrokeWidth) {
+            element.setStrokeWidth(setStrokeWidth);
+        } else {
+            if (element.getStrokeWidth() > 5) {
+                element.setStrokeWidth(0.1);
+                element.isSelected = false;
+            } else {
+                element.setStrokeWidth(highlightWidth);
+                element.isSelected = true;
+            }
+        }
+    }
+    
+
+    //var tweens = [];
+    var tween;
+
+    document.getElementById('searchbtn').addEventListener('click', function() {
+    	var searchEmpId = $('#namelist').val();//document.getElementById('namelist').options.selectedIndex.value;
+    	var searchEmpName = $('#namelist :selected').text(); //document.getElementById('namelist').options.selectedIndex.text;
+    	var searchId = "#"+searchEmpId+"k";
+    	var searchImage = dropzone.find(searchId)[0];
+    	if(searchImage == null) {
+    		searchImage = stage.find(searchId)[0];
+    	}
+    	if(searchImage != null) {
+    		if(tween != null) {
+		    	tween.reverse();
+		    	tween.destroy();
+    		}
+    		//$('#container2').scrollTo(searchId);
+    		$('html, body').animate({
+				scrollTop: searchImage.offset().top
+			}, 2000);
+	    	tween = new Kinetic.Tween({
+	            node: searchImage, 
+	            duration: 1,
+	            scaleX: 2,
+	            scaleY: 2,
+	            easing: Kinetic.Easings.ElasticEaseOut
+	          });
+	    	tween.play();
+    	} else {
+      	  alert("The employee with Name "+ searchEmpName + " is not available");
+        }
+      /* var searchImages = dropzone.find(searchId);
+      if(searchImages.length == 0) {
+    	  searchImages = stage.find(searchId);
+      }
+      if(searchImages.length != 0) {
+    	//searchImage.image.src = 'images/semployee.jpg';
+          //searchImage.myLayer.draw();
+          //$('#container2').scrollTo(searchId);
+          //$('#container2').scrollTo(searchImage.offset().right);
+           /* $('html, body').animate({
+				scrollTop: searchImage.offset().top
+			}, 2000); */ 
+          
+           /*for (var n=0; n<tweens.length; n++) {
+               tweens[n].destroy();
+             }
+            
+			searchImages.each(function(shape) {          
+               tweens.push(new Kinetic.Tween({
+                 node: shape, 
+                 duration: 1,
+                 scaleX: 2,
+                 scaleY: 2
+                 //easing: Kinetic.Easings.ElasticEaseOut
+               }).play());
+             });
+      } else {
+    	  alert("The employee with Name "+ searchEmpName + " is not available");
+      } */
+      
+		
+    }, false);
+    
+    document.getElementById('savelocbtn').addEventListener('click', function() {
+    	var empImages = dropzone.find('Image');
+    	var posArray = [];
+    	empImages.each(function(empImage) {
+    		posArray.push({
+    			"locId" : empImage.attrs.image.id,
+    			"locPosX" : empImage.x(),
+    			"locPosY" : empImage.y()
+    		});
+    	}, false);
+    	 /* $.post(
+            'locations',
+            {locations : JSON.stringify(posArray)},
+            function(data, status){
+                if("success".toUpperCase() == status.toUpperCase()) {
+                	alert("Location Saved Successfully");
+                } else {
+                	alert("Location is not Saved. Try Again");
+                }
+            }
+        ); */
+    	$.ajax({
+    		  url : 'locations',
+    		  type : "POST",
+    		  data : JSON.stringify(posArray),
+    		  contentType : "application/json; charset=utf-8",
+    		  dataType : "json",
+    		  success : function(){
+    			  alert("Location Saved Successfully");
+    		  },
+    		  error : function(){
+    			  alert("Location is not Saved. Try Again");
+    		  }
+    		}
+            );
+    	
+    }, false);
+
+
+   /* function writeMessage(message) {
+        text.setText(message);
+        layer.draw();
+    }
+ 
+    var text = new Kinetic.Text({
+        x: 10,
+        y: 10,
+        fontFamily: 'Calibri',
+        fontSize: 24,
+        text: '',
+        fill: 'black'
+      });
+    layer.add(text); */
+  
+  
+   
+</script>
+</body>
+
+</html> 
